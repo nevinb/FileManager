@@ -1,73 +1,68 @@
-using System;
-using System.Collections.Concurrent;
-using System.Data;
-using System.Threading.Tasks;
+using FM.API.Models;
+using FM.API.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Data;
+using System.Threading.Tasks;
 
 namespace FM.API.Data
 {
     public class SqlServerTenantConnectionFactory : ITenantConnectionFactory
     {
         private readonly IConfiguration _configuration;
+        private readonly FirmResolutionService _firmResolutionService;
         private readonly ILogger<SqlServerTenantConnectionFactory> _logger;
-        private readonly ConcurrentDictionary<string, string> _connectionStringCache;
 
         public SqlServerTenantConnectionFactory(
             IConfiguration configuration,
+            FirmResolutionService firmResolutionService,
             ILogger<SqlServerTenantConnectionFactory> logger)
         {
             _configuration = configuration;
+            _firmResolutionService = firmResolutionService;
             _logger = logger;
-            _connectionStringCache = new ConcurrentDictionary<string, string>();
         }
 
         public async Task<IDbConnection> CreateConnectionAsync(string tenantId)
         {
-            if (string.IsNullOrEmpty(tenantId))
+            // Get firm configuration based on tenant ID (which is our firm code)
+            var firmConfig = _firmResolutionService.GetFirmConfiguration(tenantId);
+            var connectionString = _configuration.GetConnectionString(firmConfig.ConnectionStringName);
+            
+            if (string.IsNullOrEmpty(connectionString))
             {
-                throw new ArgumentException("Tenant ID cannot be null or empty", nameof(tenantId));
+                _logger.LogError("Connection string '{ConnectionString}' not found", firmConfig.ConnectionStringName);
+                throw new InvalidOperationException($"Connection string '{firmConfig.ConnectionStringName}' not found");
             }
-
+            
+            var connection = new SqlConnection(connectionString);
+            
             try
             {
-                // Get connection string for the tenant (using cache for performance)
-                string connectionString = _connectionStringCache.GetOrAdd(tenantId, id => GetTenantConnectionString(id));
-                
-                // Create and open a new connection
-                var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
-                
+                _logger.LogDebug("Opened connection to {ConnectionStringName} for firm {FirmCode}", 
+                    firmConfig.ConnectionStringName, firmConfig.FirmCode);
                 return connection;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to create database connection for tenant {TenantId}", tenantId);
-                throw new Exception($"Failed to connect to database for tenant {tenantId}", ex);
+                _logger.LogError(ex, "Failed to open database connection to {ConnectionString}", 
+                    firmConfig.ConnectionStringName);
+                throw;
             }
         }
 
-        private string GetTenantConnectionString(string tenantId)
+        // Helper methods to be used by repositories
+        public string GetCurrentSchema()
         {
-            // First try to get a tenant-specific connection string
-            string specificConnString = _configuration[$"ConnectionStrings:Tenant_{tenantId}"];
-            if (!string.IsNullOrEmpty(specificConnString))
-            {
-                _logger.LogDebug("Using specific connection string for tenant {TenantId}", tenantId);
-                return specificConnString;
-            }
-            
-            // Fall back to a template with tenant placeholder
-            string template = _configuration["ConnectionStrings:TenantTemplate"];
-            if (string.IsNullOrEmpty(template))
-            {
-                throw new InvalidOperationException(
-                    $"No connection string found for tenant {tenantId} and no template defined");
-            }
-            
-            _logger.LogDebug("Using connection string template for tenant {TenantId}", tenantId);
-            return template.Replace("{tenantId}", tenantId);
+            var firmConfig = _firmResolutionService.GetCurrentFirmConfiguration();
+            return firmConfig.Schema;
+        }
+
+        public string GetCurrentClientCode()
+        {
+            return _firmResolutionService.GetCurrentClientCode();
         }
     }
 }

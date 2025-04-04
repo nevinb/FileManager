@@ -3,29 +3,29 @@ using System.Collections.Generic;
 namespace FM.Worker.Services
 {
     /// <summary>
-    /// Registry for tracking tenant-specific endpoints in RabbitMQ
+    /// Registry for tracking firm-specific endpoints in RabbitMQ
     /// </summary>
     public interface ITenantEndpointRegistry
     {
         /// <summary>
-        /// Gets or creates a queue name for the given tenant and config
+        /// Gets or creates a queue name for the given firm and client
         /// </summary>
-        string GetQueueName(string tenantId, string configId);
+        string GetQueueName(string firmCode, string clientCode);
 
         /// <summary>
-        /// Checks if an endpoint is registered for the given tenant and config
+        /// Checks if an endpoint is registered for the given firm and config
         /// </summary>
-        bool IsEndpointRegistered(string tenantId, int configId);
+        bool IsEndpointRegistered(string firmCode, int configId);
         
         /// <summary>
-        /// Registers an endpoint for a tenant and config combination
+        /// Registers an endpoint for a firm and config combination
         /// </summary>
-        void RegisterEndpoint(string tenantId, int configId, string queueName);
+        void RegisterEndpoint(string firmCode, int configId, string queueName);
         
         /// <summary>
-        /// Gets the endpoint name for a tenant and config combination
+        /// Gets the endpoint name for a firm and config combination
         /// </summary>
-        string GetEndpointName(string tenantId, int configId);
+        string GetEndpointName(string firmCode, int configId);
         
         /// <summary>
         /// Gets all registered endpoint names

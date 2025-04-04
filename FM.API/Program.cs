@@ -8,6 +8,10 @@ using Microsoft.Extensions.Configuration;
 using FM.API.Data;
 using FM.API.Data.Models;
 using System.Threading.Tasks;
+using FM.API.Services;
+using FM.API.Middleware;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using HealthChecks.SqlServer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +25,14 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add memory cache for multi-tenant configuration
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+
+// Register multi-tenant services
+builder.Services.AddScoped<FirmResolutionService>();
+builder.Services.AddScoped<ITenantConnectionFactory, SqlServerTenantConnectionFactory>();
+
 // Add database
 builder.Services.AddScoped<SqliteConnection>(sp => 
     new SqliteConnection(builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db"));
@@ -29,9 +41,6 @@ builder.Services.AddScoped<SqliteConnection>(sp =>
 builder.Services.AddScoped<IJobRepository, JobRepository>();
 builder.Services.AddScoped<IJobHistoryRepository, JobHistoryRepository>();
 builder.Services.AddScoped<DatabaseInitializer>();
-
-// Register the tenant connection factory
-builder.Services.AddSingleton<ITenantConnectionFactory, SqlServerTenantConnectionFactory>();
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -65,6 +74,17 @@ builder.Services.AddMassTransitWithHealthChecks(x =>
     });
 });
 
+// Add health checks for SQL Server databases
+builder.Services.AddHealthChecks()
+    .AddSqlServer(
+        connectionString: builder.Configuration.GetConnectionString("shared-db") ?? string.Empty,
+        name: "shared-database",
+        tags: new[] { "database", "sql", "shared" })
+    .AddSqlServer(
+        connectionString: builder.Configuration.GetConnectionString("firm-abc-db") ?? string.Empty,
+        name: "firm-abc-database", 
+        tags: new[] { "database", "sql", "firm-abc" });
+
 var app = builder.Build();
 
 // Initialize the database
@@ -86,6 +106,9 @@ app.UseCors("AllowAll");
 
 // Map default health check endpoints
 app.MapDefaultEndpoints();
+
+// Add firm middleware for multi-tenant resolution
+app.UseFirmMiddleware();
 
 // API endpoints
 app.MapGet("/", () => "File Management API is running");

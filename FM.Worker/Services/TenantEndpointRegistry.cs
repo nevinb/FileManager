@@ -15,54 +15,54 @@ namespace FM.Worker.Services
             _logger = logger;
         }
 
-        public string GetQueueName(string tenantId, string configId)
+        public string GetQueueName(string firmCode, string clientCode)
         {
-            string key = GetEndpointKey(tenantId, configId);
+            string key = GetEndpointKey(firmCode, clientCode);
             if (_endpointMap.TryGetValue(key, out string? queueName))
             {
                 return queueName;
             }
 
             // Generate a new queue name if not found
-            queueName = $"file-processing-{tenantId}-{configId}";
-            RegisterEndpoint(tenantId, int.Parse(configId), queueName);
+            queueName = $"file-processing-{firmCode}-{clientCode}";
+            RegisterEndpoint(firmCode, int.Parse(clientCode), queueName);
             return queueName;
         }
 
-        public void RegisterEndpoint(string tenantId, int configId, string queueName)
+        public void RegisterEndpoint(string firmCode, int configId, string queueName)
         {
-            string key = GetEndpointKey(tenantId, configId.ToString());
+            string key = GetEndpointKey(firmCode, configId.ToString());
             if (_endpointMap.TryAdd(key, queueName))
             {
-                _logger.LogInformation("Registered endpoint for tenant {TenantId}, config {ConfigId} with queue {QueueName}", 
-                    tenantId, configId, queueName);
+                _logger.LogInformation("Registered endpoint for firm {FirmCode}, config {ConfigId} with queue {QueueName}", 
+                    firmCode, configId, queueName);
             }
             else
             {
-                _logger.LogWarning("Endpoint for tenant {TenantId}, config {ConfigId} already registered", 
-                    tenantId, configId);
+                _logger.LogWarning("Endpoint for firm {FirmCode}, config {ConfigId} already registered", 
+                    firmCode, configId);
             }
         }
 
-        public void RemoveEndpoint(string tenantId, string configId)
+        public void RemoveEndpoint(string firmCode, string configId)
         {
-            string key = GetEndpointKey(tenantId, configId);
+            string key = GetEndpointKey(firmCode, configId);
             if (_endpointMap.TryRemove(key, out var queueName))
             {
-                _logger.LogInformation("Removed endpoint for tenant {TenantId}, config {ConfigId} with queue {QueueName}", 
-                    tenantId, configId, queueName);
+                _logger.LogInformation("Removed endpoint for firm {FirmCode}, config {ConfigId} with queue {QueueName}", 
+                    firmCode, configId, queueName);
             }
         }
 
-        public bool IsEndpointRegistered(string tenantId, int configId)
+        public bool IsEndpointRegistered(string firmCode, int configId)
         {
-            string key = GetEndpointKey(tenantId, configId.ToString());
+            string key = GetEndpointKey(firmCode, configId.ToString());
             return _endpointMap.ContainsKey(key);
         }
 
-        public string GetEndpointName(string tenantId, int configId)
+        public string GetEndpointName(string firmCode, int configId)
         {
-            string key = GetEndpointKey(tenantId, configId.ToString());
+            string key = GetEndpointKey(firmCode, configId.ToString());
             return _endpointMap.TryGetValue(key, out var queueName) ? queueName : string.Empty;
         }
 
@@ -71,9 +71,9 @@ namespace FM.Worker.Services
             return _endpointMap.Values;
         }
         
-        private static string GetEndpointKey(string tenantId, string configId)
+        private static string GetEndpointKey(string firmCode, string configId)
         {
-            return $"{tenantId}:{configId}";
+            return $"{firmCode}:{configId}";
         }
     }
 }

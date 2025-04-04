@@ -4,7 +4,7 @@ using Aspire.Hosting.RabbitMQ;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add the API project
+// Add the API project without SQL Server references for now
 var api = builder.AddProject<Projects.FM_API>("api")
     .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName);
 
